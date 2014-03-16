@@ -6,6 +6,10 @@
       "name": "Joe Navratil",
       "email": "navratil@gmail.com"
     },
+    "description": "A simple package for converting GPX files to JSON",
+    "keywords": ["gpx", "xml"],
+    "homepage": "https://github.com/Tapin42/gpx2js",
+    "license": "MIT",
     "engines": {
       "node": ">=0.8"
     },
