@@ -20,6 +20,9 @@ var parseMetadata = function (input) {
     if (md.name)     { rv.name = md.name[0]; }
     if (md.desc)     { rv.desc = md.desc[0]; }
     if (md.time)     { rv.time = md.time[0]; }
+    if (md.email)    { rv.email = md.email[0]; }
+    if (md.url)      { rv.url = md.url[0]; }
+    if (md.urlname)  { rv.urlname = md.urlname[0]; }
     if (md.keywords) { rv.keywords = md.keywords[0]; }
     if (md.bounds) {
         var bounds = md.bounds[0]['$'];
@@ -37,12 +40,26 @@ var parseMetadata = function (input) {
     return rv;
 };
 
+var parseWaypoint = function(input) {
+
+    var outPoint = {};
+
+    outPoint.lat = input['$'].lat;
+    outPoint.lon = input['$'].lon;
+
+    oneOfs = ['ele', 'time', 'geoidheight', 'name', 'cmt',
+              'desc', 'src', 'sym', 'type', 'sat', 'hdop', 'vdop',
+              'pdop', 'ageofdgpsdata', 'magvar', 'fix', 'url', 'urlname'];
+
+    return extend(outPoint, extractSimpleItems(input, oneOfs));
+}
+
 var parseTracks = function (input) {
     var output = [];
     for (var trackn=0; trackn < input.length; trackn++) {
         var inTrack = input[trackn];
         var outTrack = {};
-        var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type'];
+        var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'url', 'urlname'];
 
         outTrack = extend(outTrack, extractSimpleItems(inTrack, oneOfs));
 
@@ -51,22 +68,12 @@ var parseTracks = function (input) {
             var outSegment = {};
 
             for (var trkptn=0; trkptn < inSegment.trkpt.length; trkptn++) {
-                var inPoint = inSegment.trkpt[trkptn];
-                var outPoint = {};
 
-                outPoint.lat = inPoint['$'].lat;
-                outPoint.lon = inPoint['$'].lon;
-
-                oneOfs = ['ele', 'time', 'geoidheight', 'name', 'cmt',
-                          'desc', 'src', 'sym', 'type', 'sat', 'hdop', 'vdop',
-                          'pdop', 'ageofdgpsdata'];
-
-                outPoint = extend(outPoint, extractSimpleItems(inPoint, oneOfs));
-
+                var wpt = parseWaypoint(inSegment.trkpt[trkptn]);
                 if (outSegment.points) {
-                    outSegment.points.push(outPoint);
+                    outSegment.points.push(wpt);
                 } else {
-                    outSegment.points = [ outPoint ];
+                    outSegment.points = [ wpt ];
                 }
             }
 
@@ -82,6 +89,35 @@ var parseTracks = function (input) {
 
     if (output.length) {
         return { tracks: output };
+    } else {
+        return {};
+    }
+}
+
+var parseRoutes = function (input) {
+    var output = [];
+    for (var routen=0; routen < input.length; routen++) {
+        var inRoute = input[routen];
+        var outRoute = {};
+        var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'email', 'url', 'urlname'];
+
+        outRoute = extend(outRoute, extractSimpleItems(inRoute, oneOfs));
+
+        for (var wptn=0; wptn < inRoute.rtept.length; wptn++) {
+            
+            var wpt = parseWaypoint(inRoute.rtept[wptn]);
+            if (outRoute.points) {
+                outRoute.points.push(wpt);
+            } else {
+                outRoute.points = [ wpt ];
+            }
+        }
+
+        output.push(outRoute);
+    }
+
+    if (output.length) {
+        return { routes: output };
     } else {
         return {};
     }
@@ -110,6 +146,10 @@ exports.convert = function (fname, cb) {
 
             if (source.trk) {
                 result = extend(result, parseTracks(source.trk));
+            }
+
+            if (source.rte) {
+                result = extend(result, parseRoutes(source.rte));
             }
 
             cb(result);
