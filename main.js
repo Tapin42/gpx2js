@@ -17,13 +17,10 @@ var extractSimpleItems = function (input, items) {
 var parseMetadata = function (input) {
     var rv = {};
     var md = input[0];
-    if (md.name)     { rv.name = md.name[0]; }
-    if (md.desc)     { rv.desc = md.desc[0]; }
-    if (md.time)     { rv.time = md.time[0]; }
-    if (md.email)    { rv.email = md.email[0]; }
-    if (md.url)      { rv.url = md.url[0]; }
-    if (md.urlname)  { rv.urlname = md.urlname[0]; }
-    if (md.keywords) { rv.keywords = md.keywords[0]; }
+
+    var oneOfs = ['name', 'desc', 'time', 'email', 'url', 'urlname', 'keywords'];
+    rv = extend(rv, extractSimpleItems(md, oneOfs));
+
     if (md.bounds) {
         var bounds = md.bounds[0]['$'];
         rv.bounds = {
@@ -47,11 +44,23 @@ var parseWaypoint = function(input) {
     outPoint.lat = input['$'].lat;
     outPoint.lon = input['$'].lon;
 
-    oneOfs = ['ele', 'time', 'geoidheight', 'name', 'cmt',
+    var oneOfs = ['ele', 'time', 'geoidheight', 'name', 'cmt',
               'desc', 'src', 'sym', 'type', 'sat', 'hdop', 'vdop',
               'pdop', 'ageofdgpsdata', 'magvar', 'fix', 'url', 'urlname'];
 
     return extend(outPoint, extractSimpleItems(input, oneOfs));
+}
+
+var parseWaypoints = function(input) {
+
+    var points = [];
+    for (var i = 0; i < input.length; i++) {
+
+        var wpt = parseWaypoint(input[i]);
+        points.push(wpt);
+    }
+
+    return points;
 }
 
 var parseTracks = function (input) {
@@ -62,26 +71,10 @@ var parseTracks = function (input) {
         var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'url', 'urlname'];
 
         outTrack = extend(outTrack, extractSimpleItems(inTrack, oneOfs));
+        outTrack.segments = [];
 
         for (var trksegn=0; trksegn < inTrack.trkseg.length; trksegn++) {
-            var inSegment = inTrack.trkseg[trksegn];
-            var outSegment = {};
-
-            for (var trkptn=0; trkptn < inSegment.trkpt.length; trkptn++) {
-
-                var wpt = parseWaypoint(inSegment.trkpt[trkptn]);
-                if (outSegment.points) {
-                    outSegment.points.push(wpt);
-                } else {
-                    outSegment.points = [ wpt ];
-                }
-            }
-
-            if (outTrack.segments) {
-                outTrack.segments.push(outSegment);
-            } else {
-                outTrack.segments = [ outSegment ];
-            }
+            outTrack.segments.push(parseWaypoints(inTrack.trkseg[trksegn].trkpt));
         }
 
         output.push(outTrack);
@@ -102,16 +95,7 @@ var parseRoutes = function (input) {
         var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'email', 'url', 'urlname'];
 
         outRoute = extend(outRoute, extractSimpleItems(inRoute, oneOfs));
-
-        for (var wptn=0; wptn < inRoute.rtept.length; wptn++) {
-            
-            var wpt = parseWaypoint(inRoute.rtept[wptn]);
-            if (outRoute.points) {
-                outRoute.points.push(wpt);
-            } else {
-                outRoute.points = [ wpt ];
-            }
-        }
+        outRoute.points = parseWaypoints(inRoute.rtept);
 
         output.push(outRoute);
     }
@@ -142,6 +126,11 @@ exports.convert = function (fname, cb) {
 
             if (source.metadata) {
                 result = extend(result, parseMetadata(source.metadata));
+            }
+
+            if (source.wpt) {
+                var wpts = parseWaypoints(source.wpt);
+                result = extend(result, { waypoints: wpts });
             }
 
             if (source.trk) {
