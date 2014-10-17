@@ -4,11 +4,18 @@ var fs = require('fs');
 var xml2js = require('xml2js');
 var extend = require('xtend');
 
-var extractSimpleItems = function (input, items) {
-    var rv = {};
+var extractSimpleItems = function (input, items, opts) {
+    var rv = {},
+        options = opts || {};
+
     items.forEach(function(item) {
         if (typeof(input[item]) !== 'undefined') {
-            rv[item] = input[item][0];
+
+            if (options.numerical) {
+                rv[item] = parseFloat(input[item][0]);
+            } else {
+                rv[item] = input[item][0];
+            }
         }
     });
     return rv;
@@ -25,12 +32,12 @@ var parseMetadata = function (input) {
         var bounds = md.bounds[0]['$'];
         rv.bounds = {
             lat: {
-                min: bounds.minlat,
-                max: bounds.maxlat
+                min: parseFloat(bounds.minlat),
+                max: parseFloat(bounds.maxlat)
             },
             lon: {
-                min: bounds.minlon,
-                max: bounds.maxlon
+                min: parseFloat(bounds.minlon),
+                max: parseFloat(bounds.maxlon)
             }
         };
     }
@@ -41,14 +48,16 @@ var parseWaypoint = function(input) {
 
     var outPoint = {};
 
-    outPoint.lat = input['$'].lat;
-    outPoint.lon = input['$'].lon;
+    outPoint.lat = parseFloat(input['$'].lat);
+    outPoint.lon = parseFloat(input['$'].lon);
 
-    var oneOfs = ['ele', 'time', 'geoidheight', 'name', 'cmt',
-              'desc', 'src', 'sym', 'type', 'sat', 'hdop', 'vdop',
-              'pdop', 'ageofdgpsdata', 'magvar', 'fix', 'url', 'urlname'];
+    var stringValues = [ 'time', 'name', 'cmt', 'desc', 'src', 'sym', 'type', 'fix', 'url', 'urlname' ];
+    var numericalValues = [ 'ele', 'geoidheight', 'sat', 'hdop', 'vdop', 'pdop', 'ageofdgpsdata', 'magvar' ];
 
-    return extend(outPoint, extractSimpleItems(input, oneOfs));
+    outPoint = extend(outPoint, extractSimpleItems(input, stringValues));
+    outPoint = extend(outPoint, extractSimpleItems(input, numericalValues, { numerical: true }));
+
+    return outPoint;
 }
 
 var parseWaypoints = function(input) {
@@ -68,9 +77,13 @@ var parseTracks = function (input) {
     for (var trackn=0; trackn < input.length; trackn++) {
         var inTrack = input[trackn];
         var outTrack = {};
-        var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'url', 'urlname'];
 
-        outTrack = extend(outTrack, extractSimpleItems(inTrack, oneOfs));
+        var stringValues = ['name', 'cmt', 'desc', 'src', 'type', 'url', 'urlname'];
+        var numericalValues = ['number'];
+
+        outTrack = extend(outTrack, extractSimpleItems(inTrack, stringValues));
+        outTrack = extend(outTrack, extractSimpleItems(inTrack, numericalValues, { numerical: true }));
+
         outTrack.segments = [];
 
         for (var trksegn=0; trksegn < inTrack.trkseg.length; trksegn++) {
@@ -92,9 +105,13 @@ var parseRoutes = function (input) {
     for (var routen=0; routen < input.length; routen++) {
         var inRoute = input[routen];
         var outRoute = {};
-        var oneOfs = ['name', 'cmt', 'desc', 'src', 'number', 'type', 'email', 'url', 'urlname'];
 
-        outRoute = extend(outRoute, extractSimpleItems(inRoute, oneOfs));
+        var stringValues = ['name', 'cmt', 'desc', 'src', 'type', 'email', 'url', 'urlname'];
+        var numericalValues = ['number']
+
+        outRoute = extend(outRoute, extractSimpleItems(inRoute, stringValues));
+        outRoute = extend(outRoute, extractSimpleItems(inRoute, numericalValues, { numerical: true }));
+
         outRoute.points = parseWaypoints(inRoute.rtept);
 
         output.push(outRoute);
